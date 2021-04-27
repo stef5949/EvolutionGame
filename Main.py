@@ -15,35 +15,27 @@ TerrainNode[][] Map
 """
 import numpy as np
 import pygame
+from collections import defaultdict
+from random import sample, random, randint, uniform
 
-def main():
-    settings = settings()
 
-if __name__ == "__main__":
-    main()
 
 
 
 class settings():
     def __init__(self):
         #map settings
-        self.terrainSize
+        self.terrainSize = 30
         #entity settings
-        self.visionRange
+        self.visionRange = 3
         #generation settings
-        self.generationPopulationSize
-        self.generationTime
-        self.generationCount
-        self.topPerformerAmount
-        self.mutationRate
+        self.generationPopulationSize = 50
+        self.generationTime = 50
+        self.generationCount = 100
+        self.topPerformerAmount = 10
+        self.mutationRate = 0.75
         #neural network settings
         self.hiddenLayerLength = 10
-
-def setup():
-    #setup organisms
-    settings = settings()
-    #setup terrain
-
 
 
 def evolve(settings, organismsOld, generation):
@@ -77,7 +69,7 @@ def evolve(settings, organismsOld, generation):
     for i in range(0, organismsNew):
 
         # SELECTION (TRUNCATION SELECTION)
-        candidateArray = range(0, self.topPerformerAmount)
+        candidateArray = range(0, settings.topPerformerAmount)
         randomIndices = sample(candidateArray, 2)
         org_1 = organismsOld[randomIndices[0]]
         org_2 = organismsOld[randomIndices[1]]
@@ -109,14 +101,50 @@ def evolve(settings, organismsOld, generation):
                 if weightsHiddenToOutputNew[index_row][index_col] >  1: weightsHiddenToOutputNew[index_row][index_col] = 1
                 if weightsHiddenToOutputNew[index_row][index_col] < -1: weightsHiddenToOutputNew[index_row][index_col] = -1
                     
-        organismsNew.append(organism(settings, wih=weightsInputToHiddenNew, who=weightsHiddenToOutputNew, name='gen['+str(gen)+']-org['+str(i)+']'))
+        organismsNew.append(Entity(settings = settings,weightsInputToHidden = weightsInputToHiddenNew, weightsHiddenToOutput = weightsHiddenToOutputNew, name='gen['+str(generation)+']-org['+str(i)+']'))
                 
     return organismsNew, stats
 
 
+def setup():
+    #setup organisms
+    Settings = settings()
+    #setup terrain
+    terrain = Terrain(sizeX = Settings.terrainSize, sizeY = Settings.terrainSize)
+    for x in range(len(terrain.nodes)):
+        for y in range(len(terrain.nodes[x])):
+            print(str(terrain.nodes[x][y].foodValue), end = ' ')
+        print()
+
+    entityList = []
+    for i in range(Settings.generationPopulationSize):
+        weightsItoH = []
+        weightsHtoO = []
+        for hiddenLayerCount in range(Settings.hiddenLayerLength):
+            tempWeightsItoH = []
+            #food value
+            for foodValueCount in range(Settings.visionRange):
+                for visionWidthCount in range(3):
+                    tempWeightsItoH = tempWeightsItoH + [random()]
+            #move cost
+            for moveCostCount in range(Settings.visionRange):
+                for visionWidthCount in range(3):
+                    tempWeightsItoH = tempWeightsItoH + [random()]
+            #energy level
+            tempWeightsItoH = tempWeightsItoH + [random()]
+            weightsItoH = weightsItoH + [tempWeightsItoH]
+        
+        for outputLayerCount in range(4):
+            tempWeightsHtoO = []
+            for hiddenLayerCount in range(Settings.hiddenLayerLength):
+                tempWeightsHtoO = tempWeightsHtoO + [random()]
+            weightsHtoO = weightsHtoO + [tempWeightsHtoO]
+        entityList = entityList + [Entity(settings = Settings,weightsInputToHidden=weightsItoH,weightsHiddenToOutput=weightsHtoO,name='gen['+str(0)+']-org['+str(i)+']')]
+        entityList[i].randomizePosition()
+
 
 def simulate(settings, organisms, foods, gen):
-
+    """
     total_time_steps = int(settings['gen_time'] / settings['dt'])
     
     #--- CYCLE THROUGH EACH TIME STEP ---------------------+
@@ -124,14 +152,13 @@ def simulate(settings, organisms, foods, gen):
 
         # PLOT SIMULATION FRAME
         #if gen == settings['gens'] - 1 and settings['plot']==True:
-        if gen==49:
-            plot_frame(settings, organisms, foods, gen, t_step)
-        
-
+        #if gen==49:
+        #    plot_frame(settings, organisms, foods, gen, t_step)
+    
         # UPDATE FITNESS FUNCTION
         for food in foods:
             for org in organisms:
-                food_org_dist = dist(org.x, org.y, food.x, food.y)
+                #food_org_dist = dist(org.x, org.y, food.x, food.y)
 
                 # UPDATE FITNESS FUNCTION
                 if food_org_dist <= 0.075:
@@ -147,12 +174,12 @@ def simulate(settings, organisms, foods, gen):
             for org in organisms:
                 
                 # CALCULATE DISTANCE TO SELECTED FOOD PARTICLE
-                food_org_dist = dist(org.x, org.y, food.x, food.y)
+                #food_org_dist = dist(org.x, org.y, food.x, food.y)
 
                 # DETERMINE IF THIS IS THE CLOSEST FOOD PARTICLE
                 if food_org_dist < org.d_food:
                     org.d_food = food_org_dist
-                    org.r_food = calc_heading(org, food)
+                    #org.r_food = calc_heading(org, food)
 
         # GET ORGANISM RESPONSE
         for org in organisms:
@@ -163,41 +190,73 @@ def simulate(settings, organisms, foods, gen):
             org.update_r(settings)
             org.update_vel(settings)
             org.update_pos(settings)
-
+        """
     return organisms
 
 
-
-
 class TerrainNode():
-    def __init__(self):
-        self.moveCost
-        self.foodValue
-        self.fertilityValue
-        self.populationLimit
-        self.population
-        self.hazardLevel
-        self.sprite
+    def __init__(self,moveCost,smallFoodfertilityValue, bigFoodFertilityValue, populationLimit,hazardLevel,sprite):
+        self.moveCost = moveCost
+        self.foodValue = foodValue
+        self.fertilityValue = fertilityValue
+        self.populationLimit = populationLimit
+        self.population = 0
+        self.hazardLevel = hazardLevel
+        self.sprite = sprite
 
 class Terrain():
-    def __init__(self):
-        self.nodes
+    plains = TerrainNode(1,1,1,10,0,"none")
+    water = TerrainNode(1,1,1,10,0,"none")
+    forest = TerrainNode(1,1,1,10,0,"none")
+    mountain = TerrainNode(1,1,1,10,0,"none")
+    nodes = 0
+    def __init__(self, sizeX, sizeY):
+        self.sizeX = sizeX
+        self.sizeY = sizeY
+        self.nodes = sizeX * [sizeY * [0]]
+        self.nodes = self.generateNodes()
+
+    def generateNodes(self):
+        for x in range(self.sizeX):
+            for y in range(self.sizeY):
+                self.nodes[x][y] = self.plains
+        return self.nodes
 
 class Entity():
-    def __init__(self):
-        self.energyLevel
-        self.visionRange
-        self.visibleTerrain
-        self.logic
-        self.position
-        self.orientation
-        self.name
+    def __init__(self, settings, weightsInputToHidden, weightsHiddenToOutput, positionX=0, positionY=0, name=""):
+        self.energyLevel = 10
+        self.settings = settings
+        self.visionRange = settings.visionRange
+        self.visibleTerrain = None
+        self.weightsInputToHidden = weightsInputToHidden
+        self.weightsHiddenToOutput = weightsInputToHidden
+        self.position = [positionX,positionY]
+        self.orientation = 0
+        self.name = name
+    
+    def __str__(self):
+        returnString = ""
+        for i in self.weightsInputToHidden:
+            returnString = returnString + str(i) + ' '
+        returnString = returnString + '\n'
+        for i in self.weightsHiddenToOutput:
+            returnString = returnString + str(i) + ' '
+        returnString = returnString + '\n'
+        for i in self.position:
+            returnString = returnString + str(i) + ' '
+        returnString = returnString + '\n'
+        returnString = returnString + self.name + ' '
+        returnString = returnString + '\n'
+        return returnString
 
-    def think(self):
+    def randomizePosition(self):
+        self.position = [int(random() * self.settings.terrainSize),int(random() * self.settings.terrainSize)]
+
+    def think(self, inputValues, terrain):
 
         # SIMPLE MLP
         activationFunc = lambda x: np.tanh(x)               # activation function
-        layerHidden1 = activationFunc(np.dot(self.weightsInputToHidden, self.inputValues))  # hidden layer
+        layerHidden1 = activationFunc(np.dot(self.weightsInputToHidden, inputValues))  # hidden layer
         layerOutput = activationFunc(np.dot(self.weightsHiddenToOutput, layerHidden1))      # output layer
 
         # UPDATE dv AND dr WITH MLP RESPONSE
@@ -205,7 +264,7 @@ class Entity():
         for index in range(layerOutput):
             if(layerOutput[index] == highestActionValue):
                 if(index == 0):
-                    self.eat()
+                    self.eat(terrain)
                 elif(index == 1):
                     self.move()
                 elif(index == 2):
@@ -213,12 +272,14 @@ class Entity():
                 elif(index == 3):
                     self.rotateRight()
 
-    def eat(currentNode):
+    def eat(self, terrain):
+        currentNode = terrain.nodes[self.position[0],self.position[1]]
         if(currentNode.foodValue>=1):
             currentNode.foodValue = currentNode.foodValue - 1
             self.energyLevel = self.energyLevel + 1
         
-    def move(self, currentRotation):
+    def move(self):
+        currentRotation = self.orientation
         if currentRotation == 0:
             self.position[1] = self.position[1] - 1
         elif currentRotation == 1:
@@ -240,19 +301,32 @@ class Entity():
             self.position[0] = self.position[0] - 1
             self.position[1] = self.position[1] - 1
         if self.position[0] < 0: self.position[0] = 0
-        if self.position[0] >= Settings.terrainSize[0]: self.position[0] = Settings.terrainSize[0]-1
+        if self.position[0] >= self.settings.terrainSize[0]: self.position[0] = self.settings.terrainSize[0]-1
         if self.position[1] < 0: self.position[1] = 0
-        if self.position[0] <= Settings.terrainSize[1]: self.position[1] = Settings.terrainSize[1]-1
+        if self.position[0] <= self.settings.terrainSize[1]: self.position[1] = self.settings.terrainSize[1]-1
 
     def rotateLeft(self):
-        self.currentRotation = self.currentRotation - 1
+        self.currentRotation = self.currentRotation - 2
         if self.currentRotation < 0: self.currentRotation = 7
         if self.currentRotation > 7: self.currentRotation = 0
 
     def rotateRight(self):
-        self.currentRotation = self.currentRotation + 1
+        self.currentRotation = self.currentRotation + 2
         if self.currentRotation < 0: self.currentRotation = 7
         if self.currentRotation > 7: self.currentRotation = 0
+
+def main():
+    setup()
+    Settings = settings()
+    """
+    for generationNumber in range(0,Settings.generationCount):
+        for generationRound in range(0,Settings.generationTime):
+            simulate()
+        evolve()
+    """
+
+if __name__ == "__main__":
+    main()
 
 
 """
