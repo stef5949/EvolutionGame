@@ -99,6 +99,7 @@ def setup():
     #setup organisms
     Settings = settings()
     #setup terrain
+    terrain = Terrain()
 
 def simulate(settings, organisms, foods, gen):
 
@@ -167,18 +168,32 @@ class settings():
 
 
 class TerrainNode():
-    def __init__(self):
-        self.moveCost
-        self.foodValue
-        self.fertilityValue
-        self.populationLimit
+    def __init__(self,moveCost,foodValue,fertilityValue,populationLimit,hazardLevel,sprite):
+        self.moveCost = moveCost
+        self.foodValue = foodValue
+        self.fertilityValue = fertilityValue
+        self.populationLimit = populationLimit
         self.population
-        self.hazardLevel
-        self.sprite
+        self.hazardLevel = hazardLevel
+        self.sprite = sprite
 
 class Terrain():
-    def __init__(self):
-        self.nodes
+    plains = TerrainNode(1,1,1,10,0,"none")
+    water = TerrainNode(1,1,1,10,0,"none")
+    forest = TerrainNode(1,1,1,10,0,"none")
+    mountain = TerrainNode(1,1,1,10,0,"none")
+    nodes = 0
+    def __init__(self, sizeX, sizeY):
+        self.sizeX = sizeX
+        self.sizeY = sizeY
+        self.nodes = [sizeX][sizeY]
+        self.nodes = self.generateNodes()
+
+    def generateNodes(self):
+        for x in range(self.sizeX):
+            for y in range(self.sizeY):
+                self.nodes[x][y] = self.plainsplains
+        return self.nodes
 
 class Entity():
     def __init__(self):
