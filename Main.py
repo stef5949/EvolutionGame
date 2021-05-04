@@ -37,7 +37,7 @@ class settings():
         #neural network settings
         self.hiddenLayerLength = 10
 
-
+#ToDo rewrite to be compatible with our code
 def evolve(settings, organismsOld, generation):
 
     #elitism_num = int(floor(settings['elitism'] * settings['pop_size']))
@@ -143,57 +143,20 @@ def setup():
         entityList[i].randomizePosition()
 
 
-def simulate(settings, organisms, foods, gen):
+def simulate(entities, terrain):
     """
-    total_time_steps = int(settings['gen_time'] / settings['dt'])
-    
-    #--- CYCLE THROUGH EACH TIME STEP ---------------------+
-    for t_step in range(0, total_time_steps, 1):
 
-        # PLOT SIMULATION FRAME
-        #if gen == settings['gens'] - 1 and settings['plot']==True:
-        #if gen==49:
-        #    plot_frame(settings, organisms, foods, gen, t_step)
-    
         # UPDATE FITNESS FUNCTION
-        for food in foods:
-            for org in organisms:
-                #food_org_dist = dist(org.x, org.y, food.x, food.y)
+        get food value for all entities.
+    """
+    # GET ORGANISM RESPONSE
+    for entity in entities:
+        entity.think()
 
-                # UPDATE FITNESS FUNCTION
-                if food_org_dist <= 0.075:
-                    org.fitness += food.energy
-                    food.respawn(settings)
+    #Update terrain
+    terrain.regenFood
 
-                # RESET DISTANCE AND HEADING TO NEAREST FOOD SOURCE
-                org.d_food = 100
-                org.r_food = 0
-
-        # CALCULATE HEADING TO NEAREST FOOD SOURCE
-        for food in foods:
-            for org in organisms:
-                
-                # CALCULATE DISTANCE TO SELECTED FOOD PARTICLE
-                #food_org_dist = dist(org.x, org.y, food.x, food.y)
-
-                # DETERMINE IF THIS IS THE CLOSEST FOOD PARTICLE
-                if food_org_dist < org.d_food:
-                    org.d_food = food_org_dist
-                    #org.r_food = calc_heading(org, food)
-
-        # GET ORGANISM RESPONSE
-        for org in organisms:
-            org.think()
-
-        # UPDATE ORGANISMS POSITION AND VELOCITY
-        for org in organisms:
-            org.update_r(settings)
-            org.update_vel(settings)
-            org.update_pos(settings)
-        """
-    return organisms
-
-
+#ToDo adjust terrain
 class TerrainNode():
     def __init__(self,moveCost,smallFoodfertilityValue, bigFoodFertilityValue, populationLimit,hazardLevel,sprite):
         self.moveCost = moveCost
@@ -221,7 +184,11 @@ class Terrain():
             for y in range(self.sizeY):
                 self.nodes[x][y] = self.plains
         return self.nodes
-
+    def regenFood(self):
+        for x in range(self.sizeX):
+            for y in range(self.sizeY):
+                if self.nodes[x][y].foodValue < 1 and randint(1,2) != 2:
+                    self.nodes[x][y].foodValue = randint(1,self.nodes[x][y].fertilityValue+1)
 class Entity():
     def __init__(self, settings, weightsInputToHidden, weightsHiddenToOutput, positionX=0, positionY=0, name=""):
         self.energyLevel = 10
@@ -277,7 +244,7 @@ class Entity():
         if(currentNode.foodValue>=1):
             currentNode.foodValue = currentNode.foodValue - 1
             self.energyLevel = self.energyLevel + 1
-        
+
     def move(self):
         currentRotation = self.orientation
         if currentRotation == 0:
@@ -314,16 +281,16 @@ class Entity():
         self.currentRotation = self.currentRotation + 2
         if self.currentRotation < 0: self.currentRotation = 7
         if self.currentRotation > 7: self.currentRotation = 0
-
+#ToDo implement visuals
 def main():
     setup()
     Settings = settings()
-    """
+
     for generationNumber in range(0,Settings.generationCount):
         for generationRound in range(0,Settings.generationTime):
             simulate()
         evolve()
-    """
+
 
 if __name__ == "__main__":
     main()
