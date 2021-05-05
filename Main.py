@@ -14,14 +14,14 @@ img sprite
 TerrainNode[][] Map
 """
 import numpy as np
-import pygame
+import pygame as pg
 from collections import defaultdict
 from random import sample, random, randint, uniform
 
 
 
 
-
+clock = pg.time.Clock()
 class settings():
     def __init__(self):
         #map settings
@@ -36,6 +36,10 @@ class settings():
         self.mutationRate = 0.75
         #neural network settings
         self.hiddenLayerLength = 10
+        #pygame settings
+        self.FPS = 4
+        self.screenWidth = 800
+        self.screenHeight = 400
 
 #ToDo rewrite to be compatible with our code
 def evolve(settings, organismsOld, generation):
@@ -109,6 +113,9 @@ def evolve(settings, organismsOld, generation):
 def setup():
     #setup organisms
     Settings = settings()
+    # Setup Pygame
+    pg.init()
+    screen = pg.display.set_mode((Settings.screenWidth, Settings.screenHeight))
     #setup terrain
     terrain = Terrain(sizeX = Settings.terrainSize, sizeY = Settings.terrainSize)
     for x in range(len(terrain.nodes)):
@@ -158,21 +165,22 @@ def simulate(entities, terrain):
 
 #ToDo adjust terrain
 class TerrainNode():
-    def __init__(self,moveCost,smallFoodfertilityValue, bigFoodFertilityValue, populationLimit,hazardLevel,sprite):
+    def __init__(self,moveCost,foodValue,smallFoodfertilityValue, bigFoodFertilityValue, populationLimit,sprite):
         self.moveCost = moveCost
         self.foodValue = foodValue
-        self.fertilityValue = fertilityValue
+        self.smallFoodfertilityValue = smallFoodfertilityValue
+        self.bigFoodFertilityValue = bigFoodFertilityValue
         self.populationLimit = populationLimit
         self.population = 0
-        self.hazardLevel = hazardLevel
         self.sprite = sprite
 
 class Terrain():
-    plains = TerrainNode(1,1,1,10,0,"none")
-    water = TerrainNode(1,1,1,10,0,"none")
-    forest = TerrainNode(1,1,1,10,0,"none")
-    mountain = TerrainNode(1,1,1,10,0,"none")
+    plains = TerrainNode(1,3,1,5,1,"none")
+    water = TerrainNode(5,2,1,3,1,"none")
+    forest = TerrainNode(2,5,3,10,1,"none")
+    mountain = TerrainNode(10,1,1,2,1,"none")
     nodes = 0
+    terrainOptions = {plains,water,forest,mountain}
     def __init__(self, sizeX, sizeY):
         self.sizeX = sizeX
         self.sizeY = sizeY
@@ -182,13 +190,14 @@ class Terrain():
     def generateNodes(self):
         for x in range(self.sizeX):
             for y in range(self.sizeY):
-                self.nodes[x][y] = self.plains
+                self.nodes[x][y] = randint(0,3)
         return self.nodes
     def regenFood(self):
         for x in range(self.sizeX):
             for y in range(self.sizeY):
                 if self.nodes[x][y].foodValue < 1 and randint(1,2) != 2:
-                    self.nodes[x][y].foodValue = randint(1,self.nodes[x][y].fertilityValue+1)
+                    fertilityValue = randint(self.nodes[x][y].smallFoodfertilityValue,self.nodes[x][y].bigFoodFertilityValue)
+                    self.nodes[x][y].foodValue = randint(1,fertilityValue+1)
 class Entity():
     def __init__(self, settings, weightsInputToHidden, weightsHiddenToOutput, positionX=0, positionY=0, name=""):
         self.energyLevel = 10
@@ -282,15 +291,20 @@ class Entity():
         if self.currentRotation < 0: self.currentRotation = 7
         if self.currentRotation > 7: self.currentRotation = 0
 #ToDo implement visuals
+running = True
 def main():
     setup()
     Settings = settings()
-
-    for generationNumber in range(0,Settings.generationCount):
-        for generationRound in range(0,Settings.generationTime):
-            simulate()
-        evolve()
-
+    while running:
+        clock.tick(Settings.FPS)
+        for event in pg.event.get():
+            if event.type == pg.QUIT:
+                running = False
+        for generationNumber in range(0,Settings.generationCount):
+            for generationRound in range(0,Settings.generationTime):
+                simulate()
+            evolve()
+        pg.display.flip()
 
 if __name__ == "__main__":
     main()
