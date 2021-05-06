@@ -9,6 +9,7 @@ int hazardLevel
 img sprite
 
 """
+import operator
 
 """
 TerrainNode[][] Map
@@ -20,21 +21,31 @@ from collections import defaultdict
 from random import sample, random, randint, uniform
 
 
-class TerrainNode():
-    def __init__(self,moveCost,foodValue,smallFoodfertilityValue, bigFoodFertilityValue, populationLimit,sprite):
+
+class TerrainNode(pg.sprite.Sprite):
+    def __init__(self,moveCost,foodValue,smallFoodfertilityValue, bigFoodFertilityValue, populationLimit,color):
         self.moveCost = moveCost
         self.foodValue = foodValue
         self.smallFoodfertilityValue = smallFoodfertilityValue
         self.bigFoodFertilityValue = bigFoodFertilityValue
         self.populationLimit = populationLimit
         self.population = 0
-        self.sprite = sprite
-
+        pg.sprite.Sprite.__init__(self)
+        self.image = pg.Surface((27, 20))
+        if color == "plains":
+            self.image.fill(pg.Color(200,210,100))
+        elif color == "water":
+            self.image.fill(pg.Color(0,0,200))
+        elif color == "forest":
+            self.image.fill(pg.Color(0,200,0))
+        elif color == "mountain":
+            self.image.fill(pg.Color(220,220,210))
+        self.rect = self.image.get_rect()
 class Terrain():
-    plains = TerrainNode(1,3,1,5,1,"none")
-    water = TerrainNode(5,2,1,3,1,"none")
-    forest = TerrainNode(2,5,3,10,1,"none")
-    mountain = TerrainNode(10,1,1,2,1,"none")
+    plains = TerrainNode(1,3,1,5,1,"plains")
+    water = TerrainNode(5,2,1,3,1,"water")
+    forest = TerrainNode(2,5,3,10,1,"forest")
+    mountain = TerrainNode(10,1,1,2,1,"mountain")
     terrainOptions = [plains,water,forest,mountain]
     def __init__(self, sizeX, sizeY):
         self.sizeX = sizeX
@@ -53,8 +64,13 @@ class Terrain():
                 if self.nodes[x][y].foodValue < 1 and randint(1,2) != 2:
                     fertilityValue = randint(self.nodes[x][y].smallFoodfertilityValue,self.nodes[x][y].bigFoodFertilityValue)
                     self.nodes[x][y].foodValue = randint(1,fertilityValue+1)
-class Entity():
+class Entity(pg.sprite.Sprite):
     def __init__(self, settings, weightsInputToHidden, weightsHiddenToOutput, positionX=0, positionY=0, name=""):
+        pg.sprite.Sprite.__init__(self)
+        self.image = pg.Surface((10, 10))
+        self.image.fill(pg.Color(220, 0, 0))
+        self.rect = self.image.get_rect()
+
         self.energyLevel = 15
         self.settings = settings
         self.visionRange = settings.visionRange
@@ -199,8 +215,10 @@ class settings():
         #pygame settings
         self.FPS = 30
         self.screenWidth = 800
-        self.screenHeight = 400
+        self.screenHeight = 600
 
+def getEnergylevel(input):
+    return input.energyLevel
 #ToDo rewrite to be compatible with our code
 def evolve(settings, organismsOld, generation):
 
@@ -219,7 +237,7 @@ def evolve(settings, organismsOld, generation):
         stats['COUNT'] += 1
 
     stats['AVG'] = stats['SUM'] / stats['COUNT']
-
+    organismsOld.sort(reverse=True,key=getEnergylevel)
     organismsNew = []
     #--- GENERATE NEW ORGANISMS ---------------------------+
     for organismCounter in range(0, organismAmount):
@@ -288,7 +306,6 @@ def setup():
     Settings = settings()
     # Setup Pygame
     pg.init()
-    screen = pg.display.set_mode((Settings.screenWidth, Settings.screenHeight))
     #setup terrain
     terrainObj = Terrain(sizeX = Settings.terrainSize, sizeY = Settings.terrainSize)
 
@@ -334,7 +351,6 @@ def simulate(entities, terrain):
         entity.think(terrain)
 
     #Update terrain
-    terrain.regenFood
 
 #ToDo adjust terrain
 
@@ -342,8 +358,30 @@ def simulate(entities, terrain):
 
 def main():
     running = True
+    backGroundGroup = pg.sprite.Group()
+    entityGroup = pg.sprite.Group()
     EntitiesObj, TerrainObj, SettingsObj = setup()
+    screen = pg.display.set_mode((SettingsObj.screenWidth, SettingsObj.screenHeight))
+    posX = 1
+    posY = 1
+    for x in range(TerrainObj.sizeX):
+        for y in range(TerrainObj.sizeY):
+            backGroundGroup.add(TerrainObj.nodes[x][y])
+            #TerrainObj.nodes[x][y].rect.center = (400, 300)
+    for x in range(TerrainObj.sizeX):
+        for y in range(TerrainObj.sizeY):
+            TerrainObj.nodes[x][y].rect.topleft = (posX,posY)
+            posY = posY + 20
+            backGroundGroup.update()
+            backGroundGroup.draw(screen)
+        posX = posX + 27
+        posY = 1
+    backGroundGroup.update()
+    backGroundGroup.draw(screen)
+    pg.display.flip()
     while running:
+        for x in range(len(EntitiesObj)):
+            entityGroup.add(EntitiesObj[x])
         clock.tick(SettingsObj.FPS)
         for event in pg.event.get():
             if event.type == pg.QUIT:
@@ -352,10 +390,15 @@ def main():
             TerrainObj.regenFood()
             for generationRound in range(0,SettingsObj.generationTime):
                 simulate(EntitiesObj, TerrainObj)
+                for x in range(len(EntitiesObj)):
+                    EntitiesObj[x].rect.topleft = TerrainObj.nodes[EntitiesObj[x].position[0]][EntitiesObj[x].position[1]].rect.topleft
+                entityGroup.update()
+                entityGroup.draw(screen)
+                pg.display.flip()
             EntitiesObj, Stats = evolve(SettingsObj, EntitiesObj, generationNumber)
             print("Generation: " + str(generationNumber) + "\nFitness Best: "+str(Stats['BEST']) + "\nFitness Worst: "+str(Stats['WORST']) + "\nFitness Average: "+str(Stats['AVG']) + "\n")
         running = False
-        pg.display.flip()
+
 
 if __name__ == "__main__":
     main()
