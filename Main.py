@@ -30,6 +30,7 @@ class TerrainNode(pg.sprite.Sprite):
         self.bigFoodFertilityValue = bigFoodFertilityValue
         self.populationLimit = populationLimit
         self.population = 0
+        """
         pg.sprite.Sprite.__init__(self)
         self.image = pg.Surface((27, 20))
         if color == "plains":
@@ -41,6 +42,7 @@ class TerrainNode(pg.sprite.Sprite):
         elif color == "mountain":
             self.image.fill(pg.Color(220,220,210))
         self.rect = self.image.get_rect()
+        """
 class Terrain():
     plains = TerrainNode(1,3,1,5,1,"plains")
     water = TerrainNode(5,2,1,3,1,"water")
@@ -66,10 +68,12 @@ class Terrain():
                     self.nodes[x][y].foodValue = randint(1,fertilityValue+1)
 class Entity(pg.sprite.Sprite):
     def __init__(self, settings, weightsInputToHidden, weightsHiddenToOutput, positionX=0, positionY=0, name=""):
+        """
         pg.sprite.Sprite.__init__(self)
         self.image = pg.Surface((10, 10))
         self.image.fill(pg.Color(220, 0, 0))
         self.rect = self.image.get_rect()
+        """
 
         self.energyLevel = 15
         self.settings = settings
@@ -80,7 +84,20 @@ class Entity(pg.sprite.Sprite):
         self.position = [positionX,positionY]
         self.orientation = 0
         self.name = name
+        self.eatCount = 0
+        self.moveCount = 0
+        self.rotateLeftCount = 0
+        self.rotateRightCount = 0
     
+    def reset(self):
+        self.energyLevel = 15
+        self.visibleTerrain = None
+        self.orientation = 0
+        self.eatCount = 0
+        self.moveCount = 0
+        self.rotateLeftCount = 0
+        self.rotateRightCount = 0
+
     def __str__(self):
         returnString = ""
         for i in self.weightsInputToHidden:
@@ -97,6 +114,10 @@ class Entity(pg.sprite.Sprite):
         return returnString
 
     def randomizePosition(self):
+        self.eatCount = 0
+        self.moveCount = 0
+        self.rotateLeftCount = 0
+        self.rotateRightCount = 0
         self.position = [int(random() * self.settings.terrainSize),int(random() * self.settings.terrainSize)]
 
     def setVision(self,terrain):
@@ -124,52 +145,57 @@ class Entity(pg.sprite.Sprite):
 
 
     def think(self, terrain):
-        if(self.energyLevel>0):
-            self.setVision(terrain)
-            # SIMPLE MLP
-            foodValues = []
-            moveCosts = []
-            for i in range(len(self.visibleTerrain)):
-                for j in range(len(self.visibleTerrain[i])):
-                    foodValues += [self.visibleTerrain[i][j].foodValue]
-                    moveCosts += [self.visibleTerrain[i][j].moveCost]
-            inputValues = foodValues + moveCosts + [self.energyLevel, self.orientation]
-            activationFunc = lambda x: np.tanh(x)               # activation function
-            layerHidden1 = activationFunc(np.dot(self.weightsInputToHidden, inputValues))  # hidden layer
-            #layerOutput = activationFunc(np.dot(self.weightsHiddenToOutput, layerHidden1))      # output layer
-            layerOutput = []
-            for outputIndex in range(4):
-                outputValue = 0
-                for hiddenIndex in range(len(layerHidden1)):
-                    outputValue+=layerHidden1[hiddenIndex] * self.weightsHiddenToOutput[outputIndex][hiddenIndex]
-                layerOutput+=[activationFunc(outputValue)]
+        self.setVision(terrain)
+        # SIMPLE MLP
+        foodValues = []
+        moveCosts = []
+        for i in range(len(self.visibleTerrain)):
+            for j in range(len(self.visibleTerrain[i])):
+                foodValues += [self.visibleTerrain[i][j].foodValue]
+                moveCosts += [self.visibleTerrain[i][j].moveCost]
+        inputValues = foodValues + moveCosts + [self.energyLevel, self.orientation]
+        activationFunc = lambda x: np.tanh(x)               # activation function
+        layerHidden1 = activationFunc(np.dot(self.weightsInputToHidden, inputValues))  # hidden layer
+        #layerOutput = activationFunc(np.dot(self.weightsHiddenToOutput, layerHidden1))      # output layer
+        layerOutput = []
+        for outputIndex in range(4):
+            outputValue = 0
+            for hiddenIndex in range(len(layerHidden1)):
+                outputValue+=layerHidden1[hiddenIndex] * self.weightsHiddenToOutput[outputIndex][hiddenIndex]
+            layerOutput+=[outputValue]
 
-            highestActionValue = np.max(layerOutput)
-            for index in range(len(layerOutput)):
-                if(layerOutput[index] == highestActionValue):
-                    if(index == 0):
-                        self.eat(terrain)
-                        #print(self.name + " is eating")
-                        self.energyLevel+=0.005
-                    elif(index == 1):
-                        self.move()
-                        self.energyLevel+=0.01
-                        if(terrain.nodes[self.position[0]][self.position[1]].foodValue>0):
-                            self.energyLevel+=0.1
-                        #print(self.name + " is moving")
-                    elif(index == 2):
-                        self.rotateLeft()
-                        #print(self.name + " is rotating left")
-                    elif(index == 3):
-                        self.rotateRight()
-                        #print(self.name + " is rotating right")
-            self.energyLevel-=0.3
+        highestActionValue = np.max(layerOutput)
+        for index in range(len(layerOutput)):
+            if(layerOutput[index] == highestActionValue):
+                if(index == 0):
+                    self.eat(terrain)
+                    self.eatCount+=1
+                    #print(self.name + " is eating")
+                    #self.energyLevel+=0.005
+                elif(index == 1):
+                    self.move()
+                    self.moveCount+=1
+                    #self.energyLevel+=0.01
+                    #if(terrain.nodes[self.position[0]][self.position[1]].foodValue>0):
+                    #    self.energyLevel+=1
+                    self.energyLevel-=terrain.nodes[self.position[0]][self.position[1]].moveCost
+                    #print(self.name + " is moving")
+                elif(index == 2):
+                    self.rotateLeft()
+                    self.rotateLeftCount+=1
+                    self.energyLevel-=terrain.nodes[self.position[0]][self.position[1]].moveCost
+                    #print(self.name + " is rotating left")
+                elif(index == 3):
+                    self.rotateRight()
+                    self.rotateRightCount+=1
+                    self.energyLevel-=terrain.nodes[self.position[0]][self.position[1]].moveCost
+                    #print(self.name + " is rotating right")
 
     def eat(self, terrain):
         currentNode = terrain.nodes[self.position[0]][self.position[1]]
         if(currentNode.foodValue>=1):
             currentNode.foodValue = currentNode.foodValue - 1
-            self.energyLevel += 1
+            self.energyLevel += 10
 
     def move(self):
         currentRotation = self.orientation
@@ -197,23 +223,24 @@ class Entity(pg.sprite.Sprite):
         if self.orientation > 3: self.orientation = 0
 
 
-clock = pg.time.Clock()
+#clock = pg.time.Clock()
 class settings():
     def __init__(self):
         #map settings
-        self.terrainSize = 30
+        self.terrainSize = 50
         #entity settings
         self.visionRange = 5
         #generation settings
-        self.generationPopulationSize = 25
-        self.generationTime = 50
-        self.generationCount = 100
-        self.topPerformerAmount = 5
+        self.generationPopulationSize = 100
+        self.generationTime = 20
+        self.generationCount = 2000
+        self.topPerformerAmount = 10
+        self.eliteCount = 5
         self.mutationRate = 0.75
         #neural network settings
         self.hiddenLayerLength = 10
         #pygame settings
-        self.FPS = 30
+        self.FPS = 100
         self.screenWidth = 800
         self.screenHeight = 600
 
@@ -237,10 +264,25 @@ def evolve(settings, organismsOld, generation):
         stats['COUNT'] += 1
 
     stats['AVG'] = stats['SUM'] / stats['COUNT']
+    avgEntityStats = [0,0,0,0]
+    for entityCount in range(len(organismsOld)):
+            stats['AVGENT-EAT']+=organismsOld[entityCount].eatCount
+            stats['AVGENT-MOVE']+=organismsOld[entityCount].moveCount
+            stats['AVGENT-ROTL']+=organismsOld[entityCount].rotateLeftCount
+            stats['AVGENT-ROTR']+=organismsOld[entityCount].rotateRightCount
+    stats['AVGENT-EAT'] = round(stats['AVGENT-EAT']/len(organismsOld),2)
+    stats['AVGENT-MOVE'] = round(stats['AVGENT-MOVE']/len(organismsOld),2)
+    stats['AVGENT-ROTL'] = round(stats['AVGENT-ROTL']/len(organismsOld),2)
+    stats['AVGENT-ROTR'] = round(stats['AVGENT-ROTR']/len(organismsOld),2)
     organismsOld.sort(reverse=True,key=getEnergylevel)
     organismsNew = []
+    
+    #Elitism - keep some of the best performers
+    for eliteIndex in range(settings.eliteCount):
+        organismsNew+= [organismsOld[eliteIndex]]
+
     #--- GENERATE NEW ORGANISMS ---------------------------+
-    for organismCounter in range(0, organismAmount):
+    for organismCounter in range(settings.eliteCount, organismAmount):
 
         # SELECTION
         candidateArray = range(0, settings.topPerformerAmount)
@@ -270,31 +312,25 @@ def evolve(settings, organismsOld, generation):
             # ALWAYS MUTATE AN INPUT WEIGHT
             # input amount: three * visionrange times two (for movecost and food level) + energy level and rotation for each hidden layer node
             #inputWeightAmt = (3 * settings.visionRange * 2 + 2) * settings.hiddenLayerLength
-            index_row = randint(0,len(weightsHiddenToOutputNew)-1)
-            index_column = randint(0,len(weightsHiddenToOutputNew[0])-1)
-            weightsInputToHiddenNew[index_row][index_column] = weightsInputToHiddenNew[index_row][index_column] * uniform(0.9, 1.1)
-            if weightsInputToHiddenNew[index_row][index_column] >  1: weightsInputToHiddenNew[index_row][index_column] = 1
-            if weightsInputToHiddenNew[index_row][index_column] < -1: weightsInputToHiddenNew[index_row][index_column] = -1
+            for mutationCount in range(25):
+                # PICK WHICH WEIGHT MATRIX TO MUTATE
+                random_pick = randint(1,100)     
 
-            # PICK WHICH WEIGHT MATRIX TO MUTATE
-            random_pick = randint(0,1)     
-
-            # MUTATE: WIH WEIGHTS
-            if random_pick == 0:
-                index_row = randint(0,len(weightsHiddenToOutputNew)-1)
-                index_column = randint(0,len(weightsHiddenToOutputNew[0])-1)
-                weightsInputToHiddenNew[index_row][index_column] = weightsInputToHiddenNew[index_row][index_column] * uniform(0.9, 1.1)
-                if weightsInputToHiddenNew[index_row][index_column] >  1: weightsInputToHiddenNew[index_row][index_column] = 1
-                if weightsInputToHiddenNew[index_row][index_column] < -1: weightsInputToHiddenNew[index_row][index_column] = -1
-                
-            # MUTATE: WHO WEIGHTS
-            if random_pick == 1:
-                #outputWeightAmt = 4 * settings.hiddenLayerLength
-                index_row = randint(0,3)
-                index_column = randint(0,settings.hiddenLayerLength-1)
-                weightsHiddenToOutputNew[index_row][index_column] = weightsHiddenToOutputNew[index_row][index_column] * uniform(0.9, 1.1)
-                if weightsHiddenToOutputNew[index_row][index_column] >  1: weightsHiddenToOutputNew[index_row][index_column] = 1
-                if weightsHiddenToOutputNew[index_row][index_column] < -1: weightsHiddenToOutputNew[index_row][index_column] = -1
+                # MUTATE: WIH WEIGHTS
+                if random_pick <= 85:
+                    index_row = randint(0,len(weightsInputToHiddenNew)-1)
+                    index_column = randint(0,len(weightsInputToHiddenNew[0])-1)
+                    weightsInputToHiddenNew[index_row][index_column] = weightsInputToHiddenNew[index_row][index_column] * uniform(0.5, 1.5)
+                    if weightsInputToHiddenNew[index_row][index_column] >  1: weightsInputToHiddenNew[index_row][index_column] = 1
+                    if weightsInputToHiddenNew[index_row][index_column] < -1: weightsInputToHiddenNew[index_row][index_column] = -1    
+                # MUTATE: WHO WEIGHTS
+                else:
+                    #outputWeightAmt = 4 * settings.hiddenLayerLength
+                    index_row = randint(0,3)
+                    index_column = randint(0,settings.hiddenLayerLength-1)
+                    weightsHiddenToOutputNew[index_row][index_column] = weightsHiddenToOutputNew[index_row][index_column] * uniform(0.5, 1.5)
+                    if weightsHiddenToOutputNew[index_row][index_column] >  1: weightsHiddenToOutputNew[index_row][index_column] = 1
+                    if weightsHiddenToOutputNew[index_row][index_column] < -1: weightsHiddenToOutputNew[index_row][index_column] = -1
 
         organismsNew.append(Entity(settings = settings,weightsInputToHidden = weightsInputToHiddenNew, weightsHiddenToOutput = weightsHiddenToOutputNew, name="gen["+str(generation)+"]-org["+str(organismCounter)+"]"))
                 
@@ -305,7 +341,7 @@ def setup():
     #setup organisms
     Settings = settings()
     # Setup Pygame
-    pg.init()
+    #pg.init()
     #setup terrain
     terrainObj = Terrain(sizeX = Settings.terrainSize, sizeY = Settings.terrainSize)
 
@@ -358,9 +394,10 @@ def simulate(entities, terrain):
 
 def main():
     running = True
+    EntitiesObj, TerrainObj, SettingsObj = setup()
+    """
     backGroundGroup = pg.sprite.Group()
     entityGroup = pg.sprite.Group()
-    EntitiesObj, TerrainObj, SettingsObj = setup()
     screen = pg.display.set_mode((SettingsObj.screenWidth, SettingsObj.screenHeight))
     posX = 1
     posY = 1
@@ -379,24 +416,40 @@ def main():
     backGroundGroup.update()
     backGroundGroup.draw(screen)
     pg.display.flip()
+    """
     while running:
+        """
         for x in range(len(EntitiesObj)):
             entityGroup.add(EntitiesObj[x])
-        clock.tick(SettingsObj.FPS)
+        #clock.tick(SettingsObj.FPS)
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 running = False
+        """
         for generationNumber in range(0,SettingsObj.generationCount):
             TerrainObj.regenFood()
             for generationRound in range(0,SettingsObj.generationTime):
                 simulate(EntitiesObj, TerrainObj)
+                """
                 for x in range(len(EntitiesObj)):
                     EntitiesObj[x].rect.topleft = TerrainObj.nodes[EntitiesObj[x].position[0]][EntitiesObj[x].position[1]].rect.topleft
                 entityGroup.update()
                 entityGroup.draw(screen)
                 pg.display.flip()
+                """
             EntitiesObj, Stats = evolve(SettingsObj, EntitiesObj, generationNumber)
-            print("Generation: " + str(generationNumber) + "\nFitness Best: "+str(Stats['BEST']) + "\nFitness Worst: "+str(Stats['WORST']) + "\nFitness Average: "+str(Stats['AVG']) + "\n")
+            highestEnergyEntity = EntitiesObj[0]
+
+            with open("output.txt", "a") as f:
+                print("Generation: " + str(generationNumber) + "\nFitness Best: "+str(round(Stats['BEST'],2)) + "\nFitness Worst: "+str(round(Stats['WORST'],2)) + "\nFitness Average: "+str(round(Stats['AVG'],2)), file=f)
+                print("Highest fitness entity actions:\ntimes eaten:" + str(highestEnergyEntity.eatCount)+"\ntimes moved:"+str(highestEnergyEntity.moveCount)+"\ntimes rotated left:"+str(highestEnergyEntity.rotateLeftCount)+"\ntimes rotated right:"+str(highestEnergyEntity.rotateRightCount), file=f) 
+                print("Average entity actions:\ntimes eaten:" + str(Stats['AVGENT-EAT'])+"\ntimes moved:"+str(Stats['AVGENT-MOVE'])+"\ntimes rotated left:"+str(Stats['AVGENT-ROTL'])+"\ntimes rotated right:"+str(Stats['AVGENT-ROTR']) + "\n", file=f)
+                print("Generation: " + str(generationNumber) + "\nFitness Best: "+str(round(Stats['BEST'],2)) + "\nFitness Worst: "+str(round(Stats['WORST'],2)) + "\nFitness Average: "+str(round(Stats['AVG'],2)))
+                print("Highest fitness entity actions:\ntimes eaten:" + str(highestEnergyEntity.eatCount)+"\ntimes moved:"+str(highestEnergyEntity.moveCount)+"\ntimes rotated left:"+str(highestEnergyEntity.rotateLeftCount)+"\ntimes rotated right:"+str(highestEnergyEntity.rotateRightCount)) 
+                print("Average entity actions:\ntimes eaten:" + str(Stats['AVGENT-EAT'])+"\ntimes moved:"+str(Stats['AVGENT-MOVE'])+"\ntimes rotated left:"+str(Stats['AVGENT-ROTL'])+"\ntimes rotated right:"+str(Stats['AVGENT-ROTR']) + "\n")
+            
+            for eliteIndex in range(SettingsObj.eliteCount):
+                EntitiesObj[eliteIndex].reset()
         running = False
 
 
